@@ -42,7 +42,7 @@ Future<void> main() async {
   }
 
   final supabaseUrl = dotenv.env['SUPABASE_URL'] ?? 'https://sbrhccewrzrpgkdtlxpf.supabase.co';
-  final supabaseAnonKey = dotenv.env['SUPABASE_ANON_KEY'] ?? '';
+  final supabaseAnonKey = dotenv.env['SUPABASE_ANON_KEY'] ?? 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNicmhjY2V3cnpycGdrZHRseHBmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI0NTM5ODQsImV4cCI6MjA4ODAyOTk4NH0.lWMs2qa9uurZ9diqCWPvDMxyDkjbqOl1Zpn-xcmeWTg';
 
   await Supabase.initialize(
     url: supabaseUrl,
