@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://wherarethey.com/sitemap.xml
