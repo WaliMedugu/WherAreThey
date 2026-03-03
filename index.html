@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <!--
+    If you are serving your web app in a path other than the root, change the
+    href value below to reflect the base path you are serving from.
+
+    The path provided below has to start and end with a slash "/" in order for
+    it to work correctly.
+
+    For more details:
+    * https://developer.mozilla.org/en-US/docs/Web/HTML/Element/base
+
+    This is a placeholder for base href that will be replaced by the value of
+    the `--base-href` argument provided to `flutter build`.
+  -->
+  <base href="/">
+
+  <meta charset="UTF-8">
+  <meta content="IE=Edge" http-equiv="X-UA-Compatible">
+  <meta name="description"
+    content="WherAreThey - Nigeria's most trusted platform for searching and reporting missing persons. Help bring them home.">
+  <meta name="keywords"
+    content="missing persons Nigeria, find people, report missing person, Nigeria safety, WherAreThey">
+  <meta name="author" content="WherAreThey Foundation">
+
+  <!-- OpenGraph / Facebook -->
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://wherarethey.com/">
+  <meta property="og:title" content="WherAreThey - Missing Person Search Nigeria">
+  <meta property="og:description"
+    content="Help find missing persons in Nigeria. Register and search for loved ones on WherAreThey.">
+  <meta property="og:image" content="https://wherarethey.com/assets/banner.png">
+
+  <!-- Twitter -->
+  <meta property="twitter:card" content="summary_large_image">
+  <meta property="twitter:url" content="https://wherarethey.com/">
+  <meta property="twitter:title" content="WherAreThey - Missing Person Search Nigeria">
+  <meta property="twitter:description"
+    content="Help find missing persons in Nigeria. Register and search for loved ones on WherAreThey.">
+  <meta property="twitter:image" content="https://wherarethey.com/assets/banner.png">
+
+  <!-- iOS meta tags & icons -->
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="apple-mobile-web-app-title" content="wherarethy">
+  <link rel="apple-touch-icon" href="icons/Icon-192.png">
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/png" href="assets/logo.png" />
+
+  <title>wherarethy</title>
+  <link rel="manifest" href="manifest.json">
+</head>
+
+<style>
+  /* Common fix for unclickable input fields in Flutter HTML Renderer */
+  flt-glass-pane {
+    cursor: auto !important;
+  }
+
+  input,
+  textarea {
+    caret-color: auto !important;
+  }
+</style>
+
+<script src="flutter_bootstrap.js" async></script>
+<script>
+  function updateMeta(title, description) {
+    if (title) {
+      document.title = title;
+      var ogTitle = document.querySelector('meta[property="og:title"]');
+      if (ogTitle) ogTitle.setAttribute('content', title);
+      var twTitle = document.querySelector('meta[property="twitter:title"]');
+      if (twTitle) twTitle.setAttribute('content', title);
+    }
+    if (description) {
+      var metaDesc = document.querySelector('meta[name="description"]');
+      if (metaDesc) metaDesc.setAttribute('content', description);
+      var ogDesc = document.querySelector('meta[property="og:description"]');
+      if (ogDesc) ogDesc.setAttribute('content', description);
+      var twDesc = document.querySelector('meta[property="twitter:description"]');
+      if (twDesc) twDesc.setAttribute('content', description);
+    }
+  }
+
+  window.addEventListener('load', function (ev) {
+    // Use the modern loader API to force HTML renderer
+    _flutter.loader.load({
+      onEntrypointLoaded: function (engineInitializer) {
+        engineInitializer.initializeEngine({
+          renderer: "html",
+        }).then(function (appRunner) {
+          appRunner.runApp();
+        });
+      }
+    });
+  });
+</script>
+</body>
+
+</html>
