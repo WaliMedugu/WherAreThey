@@ -62,7 +62,7 @@ final _router = GoRouter(
     final bool isAuthRoute = state.matchedLocation == '/auth';
 
     // 1. Auth Guard: Redirect unauthenticated users to /auth for protected routes
-    final protectedRoutes = ['/profile', '/admin', '/moderation', '/report', '/notifications', '/case'];
+    final protectedRoutes = ['/profile', '/admin', '/moderation', '/report', '/notifications'];
     if (!loggedIn && protectedRoutes.any((route) => state.matchedLocation.startsWith(route))) {
       return '/auth';
     }
@@ -502,14 +502,7 @@ class _HomePageState extends State<HomePage> {
                                  final person = _searchResults[index];
                                  return InkWell(
                                    onTap: () {
-                                     if (authRepository.isAuthenticated) {
-                                       context.push('/case/${person['id']}', extra: person);
-                                     } else {
-                                       context.push('/auth');
-                                       ScaffoldMessenger.of(context).showSnackBar(
-                                         const SnackBar(content: Text("Please sign in to view case details")),
-                                       );
-                                     }
+                                     context.push('/case/${person['id']}', extra: person);
                                    },
                                    child: Card(
                                      clipBehavior: Clip.antiAlias,

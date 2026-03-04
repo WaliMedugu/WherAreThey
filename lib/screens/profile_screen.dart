@@ -9,6 +9,7 @@ import 'notifications_screen.dart';
 import '../services/storage_service.dart';
 import '../services/notification_service.dart';
 import '../data/notification_model.dart';
+import 'package:universal_html/html.dart' as html;
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -137,6 +138,55 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
+  Future<void> _deleteAccount() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text("Delete Account?", style: GoogleFonts.outfit(fontWeight: FontWeight.bold, color: Colors.red)),
+        content: const Text(
+          "This action is permanent and cannot be undone. All your reported cases and profile information will be deleted forever.",
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text("Cancel"),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text("Delete Everything"),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      setState(() => _isLoading = true);
+      try {
+        await Supabase.instance.client.rpc('delete_user_account');
+        await Supabase.instance.client.auth.signOut();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text("Account deleted successfully.")),
+          );
+          context.go('/auth');
+          html.window.location.reload();
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text("Deletion failed: $e"), backgroundColor: Colors.red),
+          );
+        }
+      } finally {
+        if (mounted) setState(() => _isLoading = false);
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -151,6 +201,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               await Supabase.instance.client.auth.signOut();
               if (mounted) {
                 context.go('/auth');
+                html.window.location.reload();
               }
             },
             icon: const Icon(Icons.logout),
@@ -443,9 +494,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     title: const Text("Delete Account", style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
                     subtitle: const Text("Remove all your data and reports forever."),
                     trailing: const Icon(Icons.chevron_right, color: Colors.red),
-                    onTap: () {
-                       // Dialog logic as implemented before
-                    },
+                    onTap: _deleteAccount,
                   ),
                 ),
               ],

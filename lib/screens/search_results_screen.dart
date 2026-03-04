@@ -501,14 +501,7 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
   Widget _buildCaseCard(dynamic person) {
     return InkWell(
       onTap: () {
-        if (Supabase.instance.client.auth.currentUser == null) {
-          context.push('/auth');
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text("Please sign in to view case details")),
-          );
-        } else {
-          context.push('/case/${person['id']}', extra: person);
-        }
+        context.push('/case/${person['id']}', extra: person);
       },
       child: Card(
         clipBehavior: Clip.antiAlias,

@@ -1,9 +1,18 @@
 import 'dart:ui';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:intl/intl.dart';
 import 'package:go_router/go_router.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:http/http.dart' as http;
+import 'package:path_provider/path_provider.dart';
+import '../utils/image_watermark_util.dart';
+import 'package:universal_html/html.dart' as html;
+import 'package:universal_io/io.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 
 class CaseDetailsScreen extends StatefulWidget {
   final Map<String, dynamic> person;
@@ -61,6 +70,213 @@ class _CaseDetailsScreenState extends State<CaseDetailsScreen> {
     } catch (e) {
       return dateStr;
     }
+  }
+
+  Future<void> _downloadWatermarkedImage(String photoName) async {
+    final imageUrl = 'https://sbrhccewrzrpgkdtlxpf.supabase.co/storage/v1/object/public/case_photos/$photoName';
+    
+    try {
+      // 1. Download image
+      final response = await http.get(Uri.parse(imageUrl));
+      if (response.statusCode != 200) throw Exception("Failed to fetch image");
+      
+      final Uint8List imageBytes = response.bodyBytes;
+      
+      // 2. Add watermark
+      final watermarkedBytes = await ImageWatermarkUtil.addWatermark(
+        imageBytes: imageBytes,
+        location: widget.person['state_last_seen'] ?? 'Unknown',
+        contact: widget.person['reporter_phone'] ?? widget.person['reporter_email'] ?? 'N/A',
+      );
+      
+      if (watermarkedBytes == null) throw Exception("Watermark failed");
+
+      // 3. Save/Download
+      if (kIsWeb) {
+        final blob = html.Blob([watermarkedBytes]);
+        final url = html.Url.createObjectUrlFromBlob(blob);
+        final anchor = html.AnchorElement(href: url)
+          ..setAttribute("download", "wherarethey_${widget.person['name'] ?? 'case'}.jpg")
+          ..click();
+        html.Url.revokeObjectUrl(url);
+      } else {
+        // Mobile Save logic (could use image_gallery_saver but we don't have it)
+        // For now, let's at least share it or save to temp
+        final tempDir = await getTemporaryDirectory();
+        final file = File('${tempDir.path}/shared_image.jpg');
+        await file.writeAsBytes(watermarkedBytes);
+        await Share.shareXFiles([XFile(file.path)], text: 'Check this case on WherAreThey');
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Download failed: $e")));
+      }
+    }
+  }
+
+  void _showShareDialog(BuildContext context) {
+    final caseId = widget.person['id'];
+    final caseUrl = kIsWeb 
+        ? html.window.location.href 
+        : "https://wherarethey.vercel.app/case/$caseId"; // Fallback URL
+    
+    final photos = widget.person['photos'] as List? ?? [];
+    List<String> selectedPhotos = [];
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (context) => StatefulBuilder(
+        builder: (context, setStateModal) {
+          return Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  "Share Case",
+                  style: GoogleFonts.outfit(fontSize: 24, fontWeight: FontWeight.bold, color: const Color(0xFF8A7650)),
+                ),
+                const SizedBox(height: 16),
+                
+                // Copy Link Section
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade50,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.grey.shade200),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.link, color: Color(0xFF8A7650)),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          caseUrl,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      TextButton(
+                        onPressed: () {
+                          Clipboard.setData(ClipboardData(text: caseUrl));
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text("Link copied to clipboard")),
+                          );
+                        },
+                        child: const Text("Copy"),
+                      ),
+                    ],
+                  ),
+                ),
+                
+                const SizedBox(height: 24),
+                Text(
+                  "Download Images with Watermark",
+                  style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  "Images will include last seen location and contact info.",
+                  style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
+                ),
+                const SizedBox(height: 16),
+                
+                if (photos.isEmpty)
+                  const Text("No images available for this case.")
+                else
+                  SizedBox(
+                    height: 120,
+                    child: ListView.builder(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: photos.length,
+                      itemBuilder: (context, index) {
+                        final photo = photos[index];
+                        final isSelected = selectedPhotos.contains(photo);
+                        return GestureDetector(
+                          onTap: () {
+                            setStateModal(() {
+                              if (isSelected) {
+                                selectedPhotos.remove(photo);
+                              } else {
+                                selectedPhotos.add(photo);
+                              }
+                            });
+                          },
+                          child: Container(
+                            margin: const EdgeInsets.only(right: 12),
+                            width: 100,
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(12),
+                              border: isSelected 
+                                  ? Border.all(color: const Color(0xFF8A7650), width: 3)
+                                  : Border.all(color: Colors.transparent),
+                              image: DecorationImage(
+                                image: NetworkImage('https://sbrhccewrzrpgkdtlxpf.supabase.co/storage/v1/object/public/case_photos/$photo'),
+                                fit: BoxFit.cover,
+                              ),
+                            ),
+                            child: isSelected 
+                                ? const Align(
+                                    alignment: Alignment.topRight,
+                                    child: Padding(
+                                      padding: EdgeInsets.all(4.0),
+                                      child: CircleAvatar(
+                                        radius: 10,
+                                        backgroundColor: Color(0xFF8A7650),
+                                        child: Icon(Icons.check, size: 12, color: Colors.white),
+                                      ),
+                                    ),
+                                  )
+                                : null,
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                
+                const SizedBox(height: 32),
+                
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: selectedPhotos.isEmpty ? null : () async {
+                      Navigator.pop(context); // Close dialog
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text("Processing images, please wait...")),
+                      );
+                      for (final photo in selectedPhotos) {
+                        await _downloadWatermarkedImage(photo);
+                      }
+                    },
+                    icon: const Icon(Icons.download),
+                    label: Text(
+                      selectedPhotos.isEmpty 
+                        ? "Select Images to Download" 
+                        : "Download ${selectedPhotos.length} Image(s)",
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF8A7650),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 18),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 24),
+              ],
+            ),
+          );
+        },
+      ),
+    );
   }
 
   Future<void> _markAsFound() async {
@@ -265,10 +481,13 @@ class _CaseDetailsScreenState extends State<CaseDetailsScreen> {
     final size = MediaQuery.of(context).size;
     final bool isDesktop = size.width > 800;
     final photos = widget.person['photos'] as List? ?? [];
+    final bool isAuthenticated = Supabase.instance.client.auth.currentUser != null;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF9F7F2),
-      body: CustomScrollView(
+      body: Stack(
+        children: [
+          CustomScrollView(
         slivers: [
           // App Bar with Image
           SliverAppBar(
@@ -276,6 +495,11 @@ class _CaseDetailsScreenState extends State<CaseDetailsScreen> {
             pinned: true,
             backgroundColor: const Color(0xFF8A7650),
             actions: [
+              IconButton(
+                icon: const Icon(Icons.share_outlined, color: Colors.white),
+                tooltip: "Share Case",
+                onPressed: () => _showShareDialog(context),
+              ),
               IconButton(
                 icon: const Icon(Icons.flag_outlined, color: Colors.white),
                 tooltip: "Report Case",
@@ -552,6 +776,82 @@ class _CaseDetailsScreenState extends State<CaseDetailsScreen> {
             ),
           ),
         ],
+      ),
+      if (!isAuthenticated)
+        _buildAuthOverlay(context),
+      ],
+     ),
+    );
+  }
+
+  Widget _buildAuthOverlay(BuildContext context) {
+    return Positioned.fill(
+      child: ClipRect(
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
+          child: Container(
+            color: const Color(0xFFF9F7F2).withOpacity(0.6),
+            child: Center(
+              child: Container(
+                constraints: const BoxConstraints(maxWidth: 400),
+                padding: const EdgeInsets.all(32),
+                margin: const EdgeInsets.symmetric(horizontal: 24),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(24),
+                  boxShadow: [
+                    BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 40, offset: const Offset(0, 20)),
+                  ],
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF8A7650).withOpacity(0.1),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.lock_person_outlined, size: 48, color: Color(0xFF8A7650)),
+                    ),
+                    const SizedBox(height: 24),
+                    Text(
+                      "Information Protected",
+                      style: GoogleFonts.outfit(fontSize: 24, fontWeight: FontWeight.bold),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      "To protect the privacy of the missing person and their family, full case details are only visible to authenticated users.",
+                      style: TextStyle(color: Colors.grey.shade600, fontSize: 16, height: 1.5),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 32),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: () => context.push('/auth'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF8A7650),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 18),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          elevation: 0,
+                        ),
+                        child: const Text("Sign In / Register", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    TextButton(
+                      onPressed: () => context.go('/'),
+                      child: Text("Back to Home", style: TextStyle(color: Colors.grey.shade600, fontWeight: FontWeight.w600)),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }

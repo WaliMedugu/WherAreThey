@@ -3,6 +3,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:go_router/go_router.dart';
 
+import 'package:universal_html/html.dart' as html;
+
 class AuthScreen extends StatefulWidget {
   const AuthScreen({super.key});
 
@@ -35,6 +37,7 @@ class _AuthScreenState extends State<AuthScreen> {
         if (mounted) {
           if (res.session != null) {
             context.go('/');
+            html.window.location.reload();
           } else {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(content: Text("Success! Please check your email for confirmation.")),
@@ -48,6 +51,7 @@ class _AuthScreenState extends State<AuthScreen> {
         );
         if (mounted) {
           context.go('/');
+          html.window.location.reload();
         }
       }
     } on AuthException catch (e) {
