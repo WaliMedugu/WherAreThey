@@ -370,9 +370,9 @@ class _ReportCaseScreenState extends State<ReportCaseScreen> {
     try {
       final picker = ImagePicker();
       final List<XFile> images = await picker.pickMultiImage(
-        imageQuality: 70, 
-        maxWidth: 1000, 
-        maxHeight: 1000
+        imageQuality: 80, 
+        maxWidth: 2000, 
+        maxHeight: 2000
       );
       
       if (images.isNotEmpty && mounted) {

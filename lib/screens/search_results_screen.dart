@@ -1,3 +1,4 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -240,7 +241,16 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
                           ),
                         ),
                         TextButton.icon(
-                          onPressed: () => setState(() => _showDetailedSearch = !_showDetailedSearch),
+                          onPressed: () {
+                            if (Supabase.instance.client.auth.currentUser == null) {
+                              context.push('/auth');
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text("Please sign in to use advanced search filters")),
+                              );
+                            } else {
+                              setState(() => _showDetailedSearch = !_showDetailedSearch);
+                            }
+                          },
                           icon: Icon(_showDetailedSearch ? Icons.expand_less : Icons.tune),
                           label: const Text("Describe who"),
                           style: TextButton.styleFrom(
@@ -491,7 +501,14 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
   Widget _buildCaseCard(dynamic person) {
     return InkWell(
       onTap: () {
-        context.push('/case/${person['id']}', extra: person);
+        if (Supabase.instance.client.auth.currentUser == null) {
+          context.push('/auth');
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text("Please sign in to view case details")),
+          );
+        } else {
+          context.push('/case/${person['id']}', extra: person);
+        }
       },
       child: Card(
         clipBehavior: Clip.antiAlias,
@@ -506,13 +523,19 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
               child: Container(
                 color: Colors.blueGrey.shade50,
                 width: double.infinity,
-                child: (person['photos'] != null && (person['photos'] as List).isNotEmpty)
-                    ? Image.network(
-                        'https://sbrhccewrzrpgkdtlxpf.supabase.co/storage/v1/object/public/case_photos/${person['photos'][0]}',
-                        fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) => const Icon(Icons.person, size: 64, color: Colors.blueGrey),
-                      )
-                    : const Icon(Icons.person, size: 64, color: Colors.blueGrey),
+                child: ImageFiltered(
+                  imageFilter: ImageFilter.blur(
+                    sigmaX: Supabase.instance.client.auth.currentUser == null ? 10.0 : 0.0,
+                    sigmaY: Supabase.instance.client.auth.currentUser == null ? 10.0 : 0.0,
+                  ),
+                  child: (person['photos'] != null && (person['photos'] as List).isNotEmpty)
+                      ? Image.network(
+                          'https://sbrhccewrzrpgkdtlxpf.supabase.co/storage/v1/object/public/case_photos/${person['photos'][0]}',
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) => Image.asset('assets/user.png', fit: BoxFit.cover),
+                        )
+                      : Image.asset('assets/user.png', fit: BoxFit.cover),
+                ),
               ),
             ),
             Padding(

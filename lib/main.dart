@@ -1,3 +1,4 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
@@ -12,6 +13,7 @@ import 'screens/search_results_screen.dart';
 import 'screens/case_details_screen.dart';
 import 'screens/admin_dashboard_screen.dart';
 import 'screens/moderation_dashboard_screen.dart';
+import 'screens/moderator_history_screen.dart';
 import 'services/notification_service.dart';
 import 'data/notification_model.dart';
 import 'utils/seo_util.dart';
@@ -60,7 +62,7 @@ final _router = GoRouter(
     final bool isAuthRoute = state.matchedLocation == '/auth';
 
     // 1. Auth Guard: Redirect unauthenticated users to /auth for protected routes
-    final protectedRoutes = ['/profile', '/admin', '/moderation', '/report', '/notifications'];
+    final protectedRoutes = ['/profile', '/admin', '/moderation', '/report', '/notifications', '/case'];
     if (!loggedIn && protectedRoutes.any((route) => state.matchedLocation.startsWith(route))) {
       return '/auth';
     }
@@ -279,11 +281,6 @@ class _HomePageState extends State<HomePage> {
             ],
           ),
           actions: [
-            TextButton(
-              onPressed: () {},
-              child: const Text("How it Works", style: TextStyle(color: Colors.white)),
-            ),
-            const SizedBox(width: 8),
             
             // Notifications Action
             StreamBuilder<List<NotificationModel>>(
@@ -297,7 +294,16 @@ class _HomePageState extends State<HomePage> {
                   children: [
                     IconButton(
                       icon: const Icon(Icons.notifications_none, color: Colors.white),
-                      onPressed: () => context.push('/notifications'),
+                      onPressed: () {
+                        if (authRepository.isAuthenticated) {
+                          context.push('/notifications');
+                        } else {
+                          context.push('/auth');
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text("Please sign in to view your notifications")),
+                          );
+                        }
+                      },
                     ),
                     if (unreadCount > 0)
                       Positioned(
@@ -332,7 +338,16 @@ class _HomePageState extends State<HomePage> {
 
             // Profile Action
             GestureDetector(
-              onTap: () => context.push('/profile'),
+              onTap: () {
+                if (authRepository.isAuthenticated) {
+                  context.push('/profile');
+                } else {
+                  context.push('/auth');
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text("Please sign in to access your profile")),
+                  );
+                }
+              },
               child: CircleAvatar(
                 radius: 16,
                 backgroundColor: Colors.white24,
@@ -487,7 +502,14 @@ class _HomePageState extends State<HomePage> {
                                  final person = _searchResults[index];
                                  return InkWell(
                                    onTap: () {
-                                     context.push('/case/${person['id']}', extra: person);
+                                     if (authRepository.isAuthenticated) {
+                                       context.push('/case/${person['id']}', extra: person);
+                                     } else {
+                                       context.push('/auth');
+                                       ScaffoldMessenger.of(context).showSnackBar(
+                                         const SnackBar(content: Text("Please sign in to view case details")),
+                                       );
+                                     }
                                    },
                                    child: Card(
                                      clipBehavior: Clip.antiAlias,
@@ -502,13 +524,19 @@ class _HomePageState extends State<HomePage> {
                                            child: Container(
                                              color: Colors.blueGrey.shade50,
                                              width: double.infinity,
-                                             child: (person['photos'] != null && (person['photos'] as List).isNotEmpty)
-                                                 ? Image.network(
-                                                     'https://sbrhccewrzrpgkdtlxpf.supabase.co/storage/v1/object/public/case_photos/${person['photos'][0]}',
-                                                     fit: BoxFit.cover,
-                                                     errorBuilder: (context, error, stackTrace) => const Icon(Icons.person, size: 64, color: Colors.blueGrey),
-                                                   )
-                                                 : const Icon(Icons.person, size: 64, color: Colors.blueGrey),
+                                             child: ImageFiltered(
+                                               imageFilter: ImageFilter.blur(
+                                                 sigmaX: authRepository.isAuthenticated ? 0.0 : 10.0,
+                                                 sigmaY: authRepository.isAuthenticated ? 0.0 : 10.0,
+                                               ),
+                                               child: (person['photos'] != null && (person['photos'] as List).isNotEmpty)
+                                                   ? Image.network(
+                                                       'https://sbrhccewrzrpgkdtlxpf.supabase.co/storage/v1/object/public/case_photos/${person['photos'][0]}',
+                                                       fit: BoxFit.cover,
+                                                       errorBuilder: (context, error, stackTrace) => Image.asset('assets/user.png', fit: BoxFit.cover),
+                                                     )
+                                                   : Image.asset('assets/user.png', fit: BoxFit.cover),
+                                             ),
                                            ),
                                          ),
                                          Padding(
@@ -566,7 +594,7 @@ class _HomePageState extends State<HomePage> {
              
              // Footer
              Container(
-               padding: const EdgeInsets.all(48),
+               padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 48),
                width: double.infinity,
                color: Colors.blueGrey.shade900,
                child: Column(
@@ -574,27 +602,27 @@ class _HomePageState extends State<HomePage> {
                    ClipOval(
                      child: Image.asset(
                        'assets/logo.png',
-                       height: 48,
-                       width: 48,
+                       height: 32,
+                       width: 32,
                        fit: BoxFit.cover,
                      ),
                    ),
-                   const SizedBox(height: 16),
+                   const SizedBox(height: 12),
                    const Text(
                      "WherAreThey",
-                     style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold),
+                     style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
                    ),
-                   const SizedBox(height: 12),
+                   const SizedBox(height: 8),
                    const Text(
                      "A collective effort to find our loved ones.",
                      style: TextStyle(color: Colors.white54),
                    ),
-                   const SizedBox(height: 40),
+                   const SizedBox(height: 16),
                    const Divider(color: Colors.white24),
-                   const SizedBox(height: 20),
+                   const SizedBox(height: 12),
                    const Text(
                      "© 2026 WherAreThey Foundation. Built for Nigeria.",
-                     style: TextStyle(color: Colors.white30, fontSize: 12),
+                     style: TextStyle(color: Colors.white30, fontSize: 11),
                    ),
                  ],
                ),
@@ -603,7 +631,16 @@ class _HomePageState extends State<HomePage> {
          ),
        ),
        floatingActionButton: FloatingActionButton.extended(
-         onPressed: () => context.push('/report'),
+         onPressed: () {
+          if (authRepository.isAuthenticated) {
+            context.push('/report');
+          } else {
+            context.push('/auth');
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text("Please sign in to report a missing person")),
+            );
+          }
+        },
          label: const Text("Report Missing"),
          icon: const Icon(Icons.add),
          backgroundColor: const Color(0xFF8E977D),

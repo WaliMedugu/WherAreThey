@@ -147,7 +147,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
         elevation: 0,
         actions: [
           IconButton(
-            onPressed: () => Supabase.instance.client.auth.signOut(),
+            onPressed: () async {
+              await Supabase.instance.client.auth.signOut();
+              if (mounted) {
+                context.go('/auth');
+              }
+            },
             icon: const Icon(Icons.logout),
             tooltip: "Sign Out",
           ),

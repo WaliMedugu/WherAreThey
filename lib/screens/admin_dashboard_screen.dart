@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
+import 'moderator_history_screen.dart';
 
 class AdminDashboardScreen extends StatefulWidget {
   const AdminDashboardScreen({super.key});
@@ -93,6 +94,19 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                 ),
               
               if (currentRole == 'moderator') ...[
+                ListTile(
+                  leading: const Icon(Icons.history, color: Colors.orange),
+                  title: const Text("View Moderator History"),
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => ModeratorHistoryScreen(moderator: user),
+                      ),
+                    );
+                  },
+                ),
                 ListTile(
                   leading: const Icon(Icons.admin_panel_settings, color: Colors.purple),
                   title: const Text("Promote to Admin"),

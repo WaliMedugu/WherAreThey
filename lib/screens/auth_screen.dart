@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:go_router/go_router.dart';
 
 class AuthScreen extends StatefulWidget {
   const AuthScreen({super.key});
@@ -26,21 +27,28 @@ class _AuthScreenState extends State<AuthScreen> {
 
     try {
       if (_isSignUp) {
-        await supabase.auth.signUp(
+        final res = await supabase.auth.signUp(
           email: _emailController.text.trim(),
           password: _passwordController.text.trim(),
           data: {'full_name': _emailController.text.split('@')[0]}, // Default name from email
         );
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text("Success! Please check your email for confirmation.")),
-          );
+          if (res.session != null) {
+            context.go('/');
+          } else {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text("Success! Please check your email for confirmation.")),
+            );
+          }
         }
       } else {
         await supabase.auth.signInWithPassword(
           email: _emailController.text.trim(),
           password: _passwordController.text.trim(),
         );
+        if (mounted) {
+          context.go('/');
+        }
       }
     } on AuthException catch (e) {
       if (mounted) {
@@ -107,6 +115,27 @@ class _AuthScreenState extends State<AuthScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
+                        if (MediaQuery.of(context).size.width <= 800) ...[
+                          Center(
+                            child: ClipOval(
+                              child: ConstrainedBox(
+                                constraints: const BoxConstraints(
+                                  minWidth: 100,
+                                  minHeight: 100,
+                                  maxWidth: 160,
+                                  maxHeight: 160,
+                                ),
+                                child: Image.asset(
+                                  'assets/logo.png',
+                                  width: MediaQuery.of(context).size.width * 0.3,
+                                  height: MediaQuery.of(context).size.width * 0.3,
+                                  fit: BoxFit.cover,
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 24),
+                        ],
                         Text(
                           _isSignUp ? "Create Account" : "Welcome Back",
                           style: GoogleFonts.outfit(

@@ -1,7 +1,9 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:intl/intl.dart';
+import 'package:go_router/go_router.dart';
 
 class CaseDetailsScreen extends StatefulWidget {
   final Map<String, dynamic> person;
@@ -273,6 +275,23 @@ class _CaseDetailsScreenState extends State<CaseDetailsScreen> {
             expandedHeight: isDesktop ? 400 : 300,
             pinned: true,
             backgroundColor: const Color(0xFF8A7650),
+            actions: [
+              IconButton(
+                icon: const Icon(Icons.flag_outlined, color: Colors.white),
+                tooltip: "Report Case",
+                onPressed: () {
+                  if (Supabase.instance.client.auth.currentUser == null) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text("Please sign in to report this case")),
+                    );
+                    context.push('/auth');
+                    return;
+                  }
+                  _showReportCaseDialog(context);
+                },
+              ),
+              const SizedBox(width: 8),
+            ],
             flexibleSpace: FlexibleSpaceBar(
               title: Text(
                 widget.person['name'] ?? 'Unknown',
@@ -286,14 +305,20 @@ class _CaseDetailsScreenState extends State<CaseDetailsScreen> {
                 fit: StackFit.expand,
                 children: [
                   if (photos.isNotEmpty)
-                    Image.network(
-                      'https://sbrhccewrzrpgkdtlxpf.supabase.co/storage/v1/object/public/case_photos/${photos[0]}',
-                      fit: BoxFit.cover,
+                    ImageFiltered(
+                      imageFilter: ImageFilter.blur(
+                        sigmaX: Supabase.instance.client.auth.currentUser == null ? 15.0 : 0.0,
+                        sigmaY: Supabase.instance.client.auth.currentUser == null ? 15.0 : 0.0,
+                      ),
+                      child: Image.network(
+                        'https://sbrhccewrzrpgkdtlxpf.supabase.co/storage/v1/object/public/case_photos/${photos[0]}',
+                        fit: BoxFit.cover,
+                      ),
                     )
                   else
                     Container(
                       color: const Color(0xFF8A7650),
-                      child: const Icon(Icons.person, size: 100, color: Colors.white54),
+                      child: Image.asset('assets/user.png', fit: BoxFit.cover),
                     ),
                   // Gradient Overlay
                   DecoratedBox(
@@ -378,8 +403,20 @@ class _CaseDetailsScreenState extends State<CaseDetailsScreen> {
                                 image: DecorationImage(
                                   image: NetworkImage(imageUrl),
                                   fit: BoxFit.cover,
+                                  colorFilter: Supabase.instance.client.auth.currentUser == null
+                                      ? ColorFilter.mode(Colors.black.withOpacity(0.5), BlendMode.darken) // Fallback or extra effect
+                                      : null,
                                 ),
                               ),
+                              child: Supabase.instance.client.auth.currentUser == null
+                                  ? ClipRRect(
+                                      borderRadius: BorderRadius.circular(12),
+                                      child: BackdropFilter(
+                                        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                                        child: Container(color: Colors.transparent),
+                                      ),
+                                    )
+                                  : null,
                             ),
                           );
                         },
@@ -492,6 +529,22 @@ class _CaseDetailsScreenState extends State<CaseDetailsScreen> {
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                           ),
                         ),
+                  ),
+                  const SizedBox(height: 16),
+                  Center(
+                    child: TextButton.icon(
+                      onPressed: () {
+                        if (Supabase.instance.client.auth.currentUser == null) {
+                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Please sign in to report a case")));
+                          context.push('/auth');
+                          return;
+                        }
+                        _showReportCaseDialog(context);
+                      },
+                      icon: const Icon(Icons.report_problem_outlined, color: Colors.grey, size: 16),
+                      label: const Text("Is there something wrong with this case? Report it here", 
+                        style: TextStyle(color: Colors.grey, fontSize: 12, decoration: TextDecoration.underline)),
+                    ),
                   ),
                   const SizedBox(height: 100),
                 ],
@@ -765,6 +818,121 @@ Finder is with them: ${isWithThem ? 'YES' : 'NO'}
                       child: isSubmitting 
                         ? const CircularProgressIndicator(color: Colors.white)
                         : const Text("Yes, I saw this person", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                    ),
+                  ),
+                  const SizedBox(height: 40),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  void _showReportCaseDialog(BuildContext context) {
+    final reasonCtrl = TextEditingController();
+    final detailsCtrl = TextEditingController();
+    bool isSubmitting = false;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (context) => StatefulBuilder(
+        builder: (context, setStateModal) {
+          return Padding(
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.of(context).viewInsets.bottom,
+              left: 24,
+              right: 24,
+              top: 24,
+            ),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    "Report Case",
+                    style: GoogleFonts.outfit(fontSize: 24, fontWeight: FontWeight.bold, color: const Color(0xFF8A7650)),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    "Is something wrong with this case? Let us know why it should be reviewed.",
+                    style: TextStyle(color: Colors.grey.shade600, fontSize: 14),
+                  ),
+                  const SizedBox(height: 24),
+                  
+                  DropdownButtonFormField<String>(
+                    decoration: const InputDecoration(labelText: "Main Reason", border: OutlineInputBorder()),
+                    items: const [
+                      DropdownMenuItem(value: "Inappropriate Content", child: Text("Inappropriate Content")),
+                      DropdownMenuItem(value: "Incorrect Information", child: Text("Incorrect Information")),
+                      DropdownMenuItem(value: "Found Person", child: Text("Person has been found")),
+                      DropdownMenuItem(value: "Spam", child: Text("Spam / Fake Case")),
+                      DropdownMenuItem(value: "Duplicate", child: Text("Duplicate Case")),
+                      DropdownMenuItem(value: "Other", child: Text("Other")),
+                    ],
+                    onChanged: (val) => reasonCtrl.text = val ?? "",
+                  ),
+                  const SizedBox(height: 16),
+                  _buildModalTextField(
+                    label: "Additional Details (Optional)", 
+                    controller: detailsCtrl, 
+                    hint: "Provide more context...", 
+                    maxLines: 4
+                  ),
+                  const SizedBox(height: 32),
+                  
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: isSubmitting ? null : () async {
+                        if (reasonCtrl.text.isEmpty) {
+                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Please select a reason")));
+                          return;
+                        }
+                        
+                        setStateModal(() => isSubmitting = true);
+                        try {
+                          await Supabase.instance.client.from('case_reports').insert({
+                            'case_id': widget.person['id'],
+                            'reporter_id': Supabase.instance.client.auth.currentUser?.id,
+                            'reason': reasonCtrl.text,
+                            'details': detailsCtrl.text,
+                          });
+                          
+                          // Also update the case's last_reported_at to surface it in moderation
+                          await Supabase.instance.client
+                              .from('cases')
+                              .update({'last_reported_at': DateTime.now().toIso8601String()})
+                              .eq('id', widget.person['id']);
+
+                          if (mounted) {
+                            Navigator.pop(context);
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text("Thank you. Our moderators will review this case shortly.")),
+                            );
+                          }
+                        } catch (e) {
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Failed to submit report: $e")));
+                          }
+                        } finally {
+                          if (mounted) setStateModal(() => isSubmitting = false);
+                        }
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF8A7650),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 20),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      child: isSubmitting 
+                        ? const CircularProgressIndicator(color: Colors.white)
+                        : const Text("Submit Report", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                     ),
                   ),
                   const SizedBox(height: 40),
