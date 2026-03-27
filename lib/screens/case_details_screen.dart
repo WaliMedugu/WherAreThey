@@ -83,9 +83,15 @@ class _CaseDetailsScreenState extends State<CaseDetailsScreen> {
       final Uint8List imageBytes = response.bodyBytes;
       
       // 2. Add watermark
+      final locationDesc = (widget.person['location_description'] as List?)?.join(', ') ?? '';
+      final detailedLocation = "${locationDesc.isNotEmpty ? '$locationDesc, ' : ''}${widget.person['lga_last_seen'] ?? ''}, ${widget.person['state_last_seen'] ?? ''}".trim();
+      
       final watermarkedBytes = await ImageWatermarkUtil.addWatermark(
         imageBytes: imageBytes,
-        location: widget.person['state_last_seen'] ?? 'Unknown',
+        name: widget.person['name'] ?? 'Unknown Name',
+        date: _formatDate(widget.person['date_last_seen']),
+        location: detailedLocation.length > 85 ? "${detailedLocation.substring(0, 82)}..." : detailedLocation,
+        time: widget.person['time_last_seen'] ?? 'Unknown Time',
         contact: widget.person['reporter_phone'] ?? widget.person['reporter_email'] ?? 'N/A',
       );
       
@@ -528,21 +534,42 @@ class _CaseDetailsScreenState extends State<CaseDetailsScreen> {
               background: Stack(
                 fit: StackFit.expand,
                 children: [
-                  if (photos.isNotEmpty)
+                  if (photos.isNotEmpty) ...[
+                    // Blurred background (stretched to fill)
+                    Image.network(
+                      'https://sbrhccewrzrpgkdtlxpf.supabase.co/storage/v1/object/public/case_photos/${photos[0]}',
+                      fit: BoxFit.cover,
+                    ),
+                    ClipRect(
+                      child: BackdropFilter(
+                        filter: ImageFilter.blur(sigmaX: 20.0, sigmaY: 20.0),
+                        child: Container(
+                          color: Colors.black.withOpacity(0.2),
+                        ),
+                      ),
+                    ),
+                    // Foreground image (perfect size/aspect ratio)
                     ImageFiltered(
                       imageFilter: ImageFilter.blur(
                         sigmaX: Supabase.instance.client.auth.currentUser == null ? 15.0 : 0.0,
                         sigmaY: Supabase.instance.client.auth.currentUser == null ? 15.0 : 0.0,
                       ),
-                      child: Image.network(
-                        'https://sbrhccewrzrpgkdtlxpf.supabase.co/storage/v1/object/public/case_photos/${photos[0]}',
-                        fit: BoxFit.cover,
+                      child: Center(
+                        child: Image.network(
+                          'https://sbrhccewrzrpgkdtlxpf.supabase.co/storage/v1/object/public/case_photos/${photos[0]}',
+                          fit: BoxFit.contain,
+                        ),
                       ),
-                    )
-                  else
+                    ),
+                  ] else
                     Container(
                       color: const Color(0xFF8A7650),
-                      child: Image.asset('assets/user.png', fit: BoxFit.cover),
+                      child: Center(
+                        child: Opacity(
+                          opacity: 0.3,
+                          child: Image.asset('assets/user.png', height: 150),
+                        ),
+                      ),
                     ),
                   // Gradient Overlay
                   DecoratedBox(

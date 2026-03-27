@@ -29,14 +29,3 @@ DO $$ BEGIN
     CREATE POLICY "Users can insert notifications for themselves" ON public.notifications
         FOR INSERT WITH CHECK (auth.uid() = user_id);
 EXCEPTION WHEN duplicate_object THEN null; END $$;
-
--- Allow Moderators and Admins to send notifications to anyone
-DO $$ BEGIN
-    CREATE POLICY "Moderators and Admins can insert notifications for any user" ON public.notifications
-        FOR INSERT WITH CHECK (
-            EXISTS (
-                SELECT 1 FROM public.profiles
-                WHERE id = auth.uid() AND (role = 'admin' OR role = 'moderator')
-            )
-        );
-EXCEPTION WHEN duplicate_object THEN null; END $$;
