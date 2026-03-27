@@ -522,10 +522,24 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
                     sigmaY: Supabase.instance.client.auth.currentUser == null ? 10.0 : 0.0,
                   ),
                   child: (person['photos'] != null && (person['photos'] as List).isNotEmpty)
-                      ? Image.network(
-                          'https://sbrhccewrzrpgkdtlxpf.supabase.co/storage/v1/object/public/case_photos/${person['photos'][0]}',
-                          fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) => Image.asset('assets/user.png', fit: BoxFit.cover),
+                      ? Stack(
+                          fit: StackFit.expand,
+                          children: [
+                            Image.network(
+                              'https://sbrhccewrzrpgkdtlxpf.supabase.co/storage/v1/object/public/case_photos/${person['photos'][0]}',
+                              fit: BoxFit.cover,
+                            ),
+                            BackdropFilter(
+                              filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                              child: Container(color: Colors.black.withOpacity(0.05)),
+                            ),
+                            Image.network(
+                              'https://sbrhccewrzrpgkdtlxpf.supabase.co/storage/v1/object/public/case_photos/${person['photos'][0]}',
+                              fit: BoxFit.contain,
+                              errorBuilder: (context, error, stackTrace) => 
+                                Image.asset('assets/user.png', fit: BoxFit.cover),
+                            ),
+                          ],
                         )
                       : Image.asset('assets/user.png', fit: BoxFit.cover),
                 ),
