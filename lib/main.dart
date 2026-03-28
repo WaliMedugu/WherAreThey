@@ -146,8 +146,17 @@ final _router = GoRouter(
         if (state.extra != null && state.extra is Map<String, dynamic>) {
           return CaseDetailsScreen(person: state.extra as Map<String, dynamic>);
         }
-        // If navigated via URL, CaseDetailsScreen currently expects a full Map.
         return CaseDetailsIdWrapper(id: state.pathParameters['id']!);
+      },
+    ),
+    GoRoute(
+      path: '/case_:slug',
+      builder: (context, state) {
+        if (state.extra != null && state.extra is Map<String, dynamic>) {
+          return CaseDetailsScreen(person: state.extra as Map<String, dynamic>);
+        }
+        final slug = state.pathParameters['slug']!;
+        return CaseDetailsSlugWrapper(slug: slug);
       },
     ),
   ],
@@ -185,17 +194,81 @@ class CaseDetailsIdWrapper extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return FutureBuilder(
-      future: Supabase.instance.client.from('cases').select().eq('id', id).single(),
+      future: Supabase.instance.client.from('cases').select().eq('id', id).maybeSingle(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Scaffold(body: Center(child: CircularProgressIndicator()));
         }
-        if (snapshot.hasError || !snapshot.hasData) {
+        if (snapshot.hasError || !snapshot.hasData || snapshot.data == null) {
           return const Scaffold(body: Center(child: Text("Case not found")));
         }
         return CaseDetailsScreen(person: snapshot.data as Map<String, dynamic>);
       },
     );
+  }
+}
+
+// Wrapper to find case by slug (name)
+class CaseDetailsSlugWrapper extends StatelessWidget {
+  final String slug;
+  const CaseDetailsSlugWrapper({super.key, required this.slug});
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder(
+      future: _fetchBySlug(slug),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Scaffold(body: Center(child: CircularProgressIndicator()));
+        }
+        if (snapshot.hasError || !snapshot.hasData || snapshot.data == null) {
+          return const Scaffold(
+            body: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text("Case not found", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                  SizedBox(height: 8),
+                  Text("The link might be broken or the case has been removed."),
+                ],
+              ),
+            ),
+          );
+        }
+        return CaseDetailsScreen(person: snapshot.data as Map<String, dynamic>);
+      },
+    );
+  }
+
+  Future<Map<String, dynamic>?> _fetchBySlug(String slug) async {
+    try {
+      final nameQuery = slug.replaceAll('-', ' ');
+      // Try to find exact match or close match by name
+      final response = await Supabase.instance.client
+          .from('cases')
+          .select()
+          .ilike('name', nameQuery)
+          .limit(1)
+          .maybeSingle();
+      
+      if (response != null) return response;
+
+      // Fallback: search for cases that contain the words if no exact match
+      final words = slug.split('-');
+      if (words.isNotEmpty) {
+        final query = words.join('%');
+        final fallbackRes = await Supabase.instance.client
+            .from('cases')
+            .select()
+            .ilike('name', '%$query%')
+            .limit(1)
+            .maybeSingle();
+        return fallbackRes;
+      }
+      return null;
+    } catch (e) {
+      return null;
+    }
   }
 }
 
@@ -568,7 +641,7 @@ class _HomePageState extends State<HomePage> {
                                  final person = _searchResults[index];
                                  return InkWell(
                                    onTap: () {
-                                     context.push('/case/${person['id']}', extra: person);
+                                     context.push('/case_${SeoUtil.slugify(person['name'] ?? 'unknown')}', extra: person);
                                    },
                                    child: Card(
                                      clipBehavior: Clip.antiAlias,

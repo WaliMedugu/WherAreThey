@@ -10,6 +10,7 @@ import 'package:share_plus/share_plus.dart';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 import '../utils/image_watermark_util.dart';
+import '../utils/seo_util.dart';
 import 'package:universal_html/html.dart' as html;
 import 'package:universal_io/io.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
@@ -31,6 +32,13 @@ class _CaseDetailsScreenState extends State<CaseDetailsScreen> {
   @override
   void initState() {
     super.initState();
+    // Update SEO Meta tags for this case
+    final name = widget.person['name'] ?? 'Unknown Case';
+    final location = widget.person['state_last_seen'] ?? 'Nigeria';
+    SeoUtil.updateMeta(
+      title: 'Missing: $name - WherAreThey',
+      description: 'Help find $name, last seen in $location. View full details and report any sightings here.',
+    );
     _checkIfAlreadyReported();
   }
 
@@ -121,10 +129,7 @@ class _CaseDetailsScreenState extends State<CaseDetailsScreen> {
   }
 
   void _showShareDialog(BuildContext context) {
-    final caseId = widget.person['id'];
-    final caseUrl = kIsWeb 
-        ? html.window.location.href 
-        : "https://wherarethey.vercel.app/case/$caseId"; // Fallback URL
+    final caseUrl = SeoUtil.getCaseUrl(widget.person);
     
     final photos = widget.person['photos'] as List? ?? [];
     List<String> selectedPhotos = [];
@@ -690,6 +695,34 @@ class _CaseDetailsScreenState extends State<CaseDetailsScreen> {
                       _buildDetailRow("State of Origin", widget.person['state_of_origin'] ?? 'N/A'),
                       _buildDetailRow("Tribe", widget.person['tribe'] ?? 'N/A'),
                       _buildDetailRow("Languages", (widget.person['languages_spoken'] as List?)?.join(', ') ?? 'N/A'),
+                      const Divider(height: 32),
+                      InkWell(
+                        onTap: () {
+                          Clipboard.setData(ClipboardData(text: SeoUtil.getCaseUrl(widget.person)));
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text("Case link copied to clipboard")),
+                          );
+                        },
+                        child: Row(
+                          children: [
+                            const Icon(Icons.link, size: 18, color: Color(0xFF8A7650)),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                SeoUtil.getCaseUrl(widget.person),
+                                style: const TextStyle(
+                                  color: Color(0xFF8A7650),
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 13,
+                                  decoration: TextDecoration.underline,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            const Icon(Icons.copy, size: 14, color: Colors.grey),
+                          ],
+                        ),
+                      ),
                     ],
                   ),
                   const SizedBox(height: 20),

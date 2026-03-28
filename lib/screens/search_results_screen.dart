@@ -501,7 +501,7 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
   Widget _buildCaseCard(dynamic person) {
     return InkWell(
       onTap: () {
-        context.push('/case/${person['id']}', extra: person);
+        context.push('/case_${SeoUtil.slugify(person['name'] ?? 'unknown')}', extra: person);
       },
       child: Card(
         clipBehavior: Clip.antiAlias,
