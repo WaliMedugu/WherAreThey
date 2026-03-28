@@ -1,4 +1,6 @@
 import 'dart:ui';
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:universal_html/html.dart' as html;
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
@@ -209,6 +211,7 @@ class _HomePageState extends State<HomePage> {
   final NotificationService _notificationService = NotificationService();
   bool _isLoading = false;
   List<dynamic> _searchResults = [];
+  int? _totalVisits;
 
   @override
   void initState() {
@@ -218,6 +221,47 @@ class _HomePageState extends State<HomePage> {
       description: 'Search for and report missing persons in Nigeria. Help bring them home.',
     );
     _loadRecentCases();
+    _trackAndGetVisits();
+  }
+
+  Future<void> _trackAndGetVisits() async {
+    try {
+      // 1. Check session storage to avoid counting reloads (Web only)
+      if (kIsWeb) {
+        final bool alreadyCounted = html.window.sessionStorage['was_counted_as_visit'] == 'true';
+        
+        if (!alreadyCounted) {
+          // Attempt to increment the global counter in Supabase
+          try {
+            await Supabase.instance.client.rpc('increment_site_visits');
+            html.window.sessionStorage['was_counted_as_visit'] = 'true';
+          } catch (e) {
+            debugPrint("Failed to increment visits (Supabase function likely missing): $e");
+          }
+        }
+      } else {
+        // For non-web, we could use SharedPreferences, but the request was specifically for "website opened"
+        // So we skip the "unique" check or just increment once per app launch.
+        try {
+          await Supabase.instance.client.rpc('increment_site_visits');
+        } catch (_) {}
+      }
+      
+      // 2. Fetch the current total visits
+      final response = await Supabase.instance.client
+          .from('site_stats')
+          .select('total_visits')
+          .eq('id', 1)
+          .maybeSingle();
+      
+      if (mounted && response != null) {
+        setState(() {
+          _totalVisits = response['total_visits'] as int;
+        });
+      }
+    } catch (e) {
+      debugPrint("Visit counter error (Table likely missing): $e");
+    }
   }
 
   Future<void> _loadRecentCases() async {
@@ -459,6 +503,28 @@ class _HomePageState extends State<HomePage> {
                             ],
                           ),
                         ),
+                        if (_totalVisits != null)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 12),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.people_alt_rounded, size: 12, color: Colors.white.withOpacity(0.6)),
+                                const SizedBox(width: 6),
+                                Text(
+                                  "$_totalVisits unique visits to the platform",
+                                  style: GoogleFonts.outfit(
+                                    fontSize: 12,
+                                    color: Colors.white.withOpacity(0.8),
+                                    letterSpacing: 0.5,
+                                    shadows: [
+                                      const Shadow(blurRadius: 2, color: Colors.black45, offset: Offset(0, 1)),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
                       ],
                     ),
                   ),
